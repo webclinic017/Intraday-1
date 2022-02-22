@@ -1,0 +1,6 @@
+.DS_Store
+app.log
+.idea
+local_conf.py
+*-app.log
+log/*.log
