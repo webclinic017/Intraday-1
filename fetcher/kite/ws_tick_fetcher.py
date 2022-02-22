@@ -1,5 +1,5 @@
 from kiteconnect import KiteTicker
-from conf.local_conf import wss_auth_token
+from conf.local_conf import wss_auth_token, username
 from cache.aerospike import aero_client
 from utils.log import logger_instance
 logger = logger_instance
@@ -8,7 +8,7 @@ import sys
 
 class KT(KiteTicker):
     def _create_connection(self, url, **kwargs):
-        url = 'wss://ws.zerodha.com/?api_key=kitefront&user_id=YS5813&enctoken={}&uid=1624852235716&user-agent=kite3-web&version=2.9.1'.format(wss_auth_token)
+        url = 'wss://ws.zerodha.com/?api_key=kitefront&user_id={}&enctoken={}&uid=1624852235716&user-agent=kite3-web&version=2.9.1'.format(username,wss_auth_token)
         super(KT, self)._create_connection(url, **kwargs)
 
 

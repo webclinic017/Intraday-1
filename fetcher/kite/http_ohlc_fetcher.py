@@ -1,4 +1,5 @@
 from utils.log import logger_instance
+from conf.local_conf import username
 logger = logger_instance
 
 
@@ -13,7 +14,7 @@ def fetch_http_ohlc(stock, from_date=None, to_date=None, period="15minute"):
     if not to_date:
         from_date = current_date
     instrument = stock['instrumenttoken']
-    url = "https://kite.zerodha.com/oms/instruments/historical/" + str(instrument) + "/" + period + "?user_id=YS5813&oi=1&from=" + str(from_date) + "&to=" + str(to_date)
+    url = "https://kite.zerodha.com/oms/instruments/historical/" + str(instrument) + "/" + period + "?user_id=" + username +"&oi=1&from=" + str(from_date) + "&to=" + str(to_date)
 
     payload = {}
     headers = {

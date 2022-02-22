@@ -1,7 +1,7 @@
 import requests
 import time, datetime, sys
 
-from conf.local_conf import auth_token
+from conf.local_conf import auth_token, username
 from utils.log import logger_instance
 from cache.aerospike import aero_client
 
@@ -25,7 +25,7 @@ class Order(object):
             'Referer': 'https://kite.zerodha.com/chart/web/ciq/INDICES/NIFTY%2050/256265',
             'Connection': 'keep-alive',
             'X-Kite-Version': '2.9.2',
-            'X-Kite-Userid': 'YS5813',
+            'X-Kite-Userid': username,
         }
 
     def place_order(self, trading_symbol, transaction_type, quantity):
@@ -44,7 +44,7 @@ class Order(object):
             'squareoff': '0',
             'stoploss': '0',
             'trailing_stoploss': '0',
-            'user_id': 'YS5813'
+            'user_id': username
         }
         logger.info(
             "Firing {} Position  for {} for {} quantity ".format(
