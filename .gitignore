@@ -4,3 +4,4 @@ app.log
 local_conf.py
 *-app.log
 log/*.log
+*.pyc
