@@ -1,14 +1,3 @@
-import datetime
-import pandas as pd
-from fetcher.kite.http_ohlc_fetcher import fetch_http_ohlc
-from indicator.pivot import df_calculate_pivot_points
-from utils.log import logger_instance
-
-logger = logger_instance
-
-# nifty_stock_list = [{"instrumenttoken": 3861249, "tradingsymbol": "ADANIPORTS"}]
-
-
 nifty_stock_list = [{"instrumenttoken": 3861249, "tradingsymbol": "ADANIPORTS"},
                     {"instrumenttoken": 60417, "tradingsymbol": "ASIANPAINT"},
                     {"instrumenttoken": 1510401, "tradingsymbol": "AXISBANK"},
@@ -59,45 +48,3 @@ nifty_stock_list = [{"instrumenttoken": 3861249, "tradingsymbol": "ADANIPORTS"},
                     {"instrumenttoken": 969473, "tradingsymbol": "WIPRO"},
                     {"instrumenttoken": 3050241, "tradingsymbol": "YESBANK"},
                     {"instrumenttoken": 975873, "tradingsymbol": "ZEEL"}]
-
-
-def start_scanner():
-    current_time = datetime.datetime.now()
-    current_date = datetime.datetime.now().date()
-    previous_date = current_date - datetime.timedelta(days=1)
-    for stock in nifty_stock_list:
-        previous_day_data = fetch_http_ohlc(stock=stock, from_date=previous_date, to_date=previous_date,
-                                            period="day")
-        current_15minute_data = fetch_http_ohlc(stock=stock, from_date=current_date, to_date=current_date,
-                                                period="5minute")
-        df_previous_day_data = pd.DataFrame(previous_day_data,
-                                            columns=["date", "open", "high", "low", "close", "volume", "oi"])
-        df_current_15minute_data = pd.DataFrame(current_15minute_data,
-                                                columns=["date", "open", "high", "low", "close", "volume", "oi"])
-        #pivot_points = df_calculate_pivot_points(df_previous_day_data)
-        pdh = df_previous_day_data.iloc[0].high
-        pdl = df_previous_day_data.iloc[0].low
-        current_day_open = df_current_15minute_data.iloc[0].open
-        current_day_high = df_current_15minute_data.iloc[0].high
-        current_day_low = df_current_15minute_data.iloc[0].low
-        current_day_close = df_current_15minute_data.iloc[0].close
-        print(current_day_open, current_day_low, pdh, stock)
-
-        #Open Drive Breakout
-        if current_day_open == current_day_low and current_day_open > pdh:
-            logger.info("Open Drive Buy Candidate {}".format(stock))
-        if current_day_open == current_day_high and current_day_open < pdl:
-            logger.info("Open Drive Sell Candidate {}".format(stock))
-
-        # #Previous Day High Low Breakout
-        # if current_day_open == current_day_low and current_day_close > pdh:
-        #     logger.info("PDL Buy Candidate {}".format(stock))
-        # if current_day_open == current_day_high and current_day_close < pdl:
-        #     logger.info("PDL  Sell Candidate {}".format(stock))
-
-
-
-start_scanner()
-
-if __name__ == '__main__':
-    start_scanner()
