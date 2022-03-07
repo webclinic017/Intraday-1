@@ -72,41 +72,54 @@ class TestStrategy(bt.Strategy):
                 if self.stop_order.status in [self.stop_order.Submitted, self.stop_order.Accepted]:
                     self.cancel(self.stop_order)
 
+    def next_open(self):
+        current_date = self.data0.datetime.datetime().date()
+        for i in range(1, 5):
+            previous_date = current_date - datetime.timedelta(days=i)
+            dfprevday = self.prevday.loc[(self.prevday['date'] == previous_date)]
+            if dfprevday.empty:
+                continue
+            else:
+                break
+        if i == 4:
+            return
+            # Check if an order is pending ... if yes, we cannot send a 2nd one
+
         if not self.position:
-            if self.data0.datetime.datetime().time().hour == 9 and self.data0.datetime.datetime().time().minute == 15:
+            if self.data0.datetime.datetime().time().hour == 9 and self.data0.datetime.datetime().time().minute == 20:
                 dfprevday = self.prevday.loc[(self.prevday['date'] == previous_date)]
-                if self.data0.open[0] == self.data0.low[0] and self.data0.low[0] > \
-                        dfprevday.iloc[0].high:
+                if self.data0.open[-1] == self.data0.low[-1] and self.data0.low[-1] > \
+                        dfprevday.iloc[0].high and self.data0.open[0] >= self.data0.close[-1]:
                     self.order = self.buy(transmit=False)
-                    self.log('BUY CREATE, {}, Order Ref: {}  '.format(self.data0.close[0], self.order.ref))
+                    self.log('BUY CREATE, {}, Order Ref: {}  '.format(self.data0.open[0], self.order.ref))
                     if not self.p.trail_percent:
-                        stop_price = self.data.close[0] * (1.0 - self.p.stop_loss)
+                        stop_price = self.data0.open[0] * (1.0 - self.p.stop_loss)
                         self.stop_order = self.sell(exectype=bt.Order.Stop, price=stop_price, parent=self.order)
-                        self.log('Sell SL Trigger, {}, Order Ref: {}'.format(self.dataclose[0], self.stop_order.ref))
+                        self.log('Sell SL Trigger, {}, Order Ref: {}'.format(self.data0.open[0], self.stop_order.ref))
                     else:
-                        stop_price = self.data.close[0] * (1.0 - self.p.stop_loss)
+                        stop_price = self.data0.open[0] * (1.0 - self.p.stop_loss)
                         self.stop_order = self.sell(exectype=bt.Order.StopTrailLimit, trailpercent=self.p.trail_percent,
                                                     parent=self.order, price=stop_price)
-                        self.log('Sell TSL Trigger, {}, Order Ref: {}'.format(self.dataclose[0], self.stop_order.ref))
+                        self.log('Sell TSL Trigger, {}, Order Ref: {}'.format(self.data0.open[0], self.stop_order.ref))
 
                 else:
-                    if self.data0.open[0] == self.data0.high[0] and self.data0.high[0] < \
-                            dfprevday.iloc[0].low:
+                    if self.data0.open[-1] == self.data0.high[-1] and self.data0.high[-1] < \
+                            dfprevday.iloc[0].low and self.data0.open[0] <= self.data0.close[-1]:
                         # Keep track of the created order to avoid a 2nd order
                         self.order = self.sell(transmit=False)
-                        self.log('SELL CREATE, {}, Order Ref: {}'.format(self.dataclose[0], self.order.ref))
+                        self.log('SELL CREATE, {}, Order Ref: {}'.format(self.data0.open[0], self.order.ref))
                         if not self.p.trail_percent:
-                            stop_price = self.data.close[0] * (1.0 + self.p.stop_loss)
+                            stop_price = self.data0.open[0] * (1.0 + self.p.stop_loss)
                             self.stop_order = self.buy(exectype=bt.Order.Stop, price=stop_price, parent=self.order)
                             self.log(
-                                'Buy SL Trigger, {}, Order Ref: {}'.format(self.dataclose[0], self.stop_order.ref))
+                                'Buy SL Trigger, {}, Order Ref: {}'.format(self.data0.open[0], self.stop_order.ref))
                         else:
-                            stop_price = self.data.close[0] * (1.0 + self.p.stop_loss)
+                            stop_price = self.data0.open[0] * (1.0 + self.p.stop_loss)
                             self.stop_order = self.buy(exectype=bt.Order.StopTrailLimit,
                                                        trailpercent=self.p.trail_percent,
                                                        parent=self.order, price=stop_price)
                             self.log(
-                                'Buy TSL Trigger, {}, Order Ref: {}'.format(self.dataclose[0], self.stop_order.ref))
+                                'Buy TSL Trigger, {}, Order Ref: {}'.format(self.data0.open[0], self.stop_order.ref))
 
 
 def generate_data(stock, start_date, end_date):
@@ -139,8 +152,8 @@ def generate_data(stock, start_date, end_date):
 
     data = bt.feeds.PandasData(dataname=df5min)
 
-    cerebro = bt.Cerebro()
-    cerebro.addstrategy(TestStrategy, df1day=df1day, trail_percent=False, stop_loss=0.01, take_profit=0.015)
+    cerebro = bt.Cerebro(cheat_on_open=True)
+    cerebro.addstrategy(TestStrategy, df1day=df1day, trail_percent=False, stop_loss=0.01, take_profit=0.02)
 
     cerebro.adddata(data)
     # Set our desired cash start
@@ -175,8 +188,8 @@ if __name__ == '__main__':
 
     stock_list = nifty_stock_list
     mtm_list = []
-    start_date = datetime.date(2021, 12, 1)
-    end_date = datetime.date(2021, 12, 31)
+    start_date = datetime.date(2021, 1, 1)
+    end_date = datetime.date(2021, 3, 28)
     # stock_list = [
     #     {"instrumenttoken": 3861249, "tradingsymbol": "ADANIPORTS"}
     # ]
