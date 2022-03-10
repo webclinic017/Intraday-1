@@ -64,7 +64,7 @@ nifty_stock_list = [{"instrumenttoken": 3861249, "tradingsymbol": "ADANIPORTS"},
 def start_scanner():
     current_time = datetime.datetime.now()
     current_date = datetime.datetime.now().date()
-    previous_date = current_date - datetime.timedelta(days=3)
+    previous_date = current_date - datetime.timedelta(days=1)
     for stock in nifty_stock_list:
         previous_day_data = fetch_http_ohlc(stock=stock, from_date=previous_date, to_date=previous_date,
                                             period="day")

@@ -36,4 +36,9 @@ def get_aerospike_client():
     return a
 
 
+def get_ltp_key(instrument):
+    key = str(instrument['instrument_token']) + ".ltp"
+    return key
+
+
 aero_client = get_aerospike_client()

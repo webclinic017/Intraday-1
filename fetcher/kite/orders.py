@@ -3,6 +3,7 @@ import time, datetime, sys
 
 from conf.local_conf import auth_token, username
 from utils.log import logger_instance
+from kiteconnect import KiteConnect
 
 logger = logger_instance
 
@@ -16,7 +17,6 @@ class Order(object):
             'Accept': 'application/json, text/plain, */*',
             'Authorization': '{}'.format(auth_token),
             'Accept-Language': 'en-us',
-            'Accept-Encoding': 'gzip, deflate, br',
             'Host': 'kite.zerodha.com',
             'Origin': 'https://kite.zerodha.com',
             'Content-Length': '240',
@@ -27,7 +27,9 @@ class Order(object):
             'X-Kite-Userid': username,
         }
 
-    def place_order(self, trading_symbol, transaction_type=None, quantity=0, order_type='MARKET', trigger_price=0, exchange='NFO'):
+    def place_order(self, trading_symbol, transaction_type=KiteConnect.TRANSACTION_TYPE_BUY, quantity=0,
+                    order_type=KiteConnect.ORDER_TYPE_MARKET, trigger_price=0,
+                    exchange=KiteConnect.EXCHANGE_NSE, product=KiteConnect.PRODUCT_MIS):
         data = {
             'variety': 'regular',
             'exchange': exchange,
@@ -36,7 +38,7 @@ class Order(object):
             'order_type': order_type,
             'quantity': quantity,
             'price': '0',
-            'product': 'MIS',
+            'product': product,
             'validity': 'DAY',
             'disclosed_quantity': '0',
             'trigger_price': trigger_price,
@@ -52,5 +54,5 @@ class Order(object):
                 quantity))
         response = requests.post('https://kite.zerodha.com/oms/orders/regular', headers=self.headers, cookies={},
                                  data=data)
-        logger.debug("Position attempted Status:{}, Response:{}".format(response.status_code, response.content))
+        logger.debug("Position attempted Status:{}, Response:{}".format(response.status_code, response.json()))
         return response

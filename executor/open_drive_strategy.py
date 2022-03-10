@@ -1,4 +1,6 @@
 from fetcher.kite.http_ohlc_fetcher import fetch_http_ohlc
+from cache.aerospike import aero_client, get_ltp_key
+from kiteconnect import KiteConnect
 import datetime
 import pandas as pd
 import time
@@ -43,6 +45,7 @@ def open_drive_execute(instrument_list):
         current_time = datetime.datetime.now()
         if current_time.hour == 9 and current_time.minute == 21:
             for instrument in instrument_list:
+                loop_flag = False
                 df_previous_day_data, pdh, pdl = get_previous_day_data(instrument, current_date)
                 current_5minute_data = fetch_http_ohlc(stock=instrument, from_date=current_date, to_date=current_date,
                                                        period="5minute")
@@ -54,36 +57,56 @@ def open_drive_execute(instrument_list):
                 df_current_1minute_data = pd.DataFrame(current_1minute_data,
                                                        columns=["date", "open", "high", "low", "close",
                                                                 "volume", "oi"])
-
+                key = get_ltp_key(instrument['instrumenttoken'])
+                ltp = aero_client.get(key)
                 # if the first 5 minute candle opens with low=close and is above pdh and
                 # 6th 1 minute candle open is above the close of 1st 5 minute candle
                 # candle to candle stop loss i.e close of first 5 minute candle is SL
                 # we are only hunting for parabolic candles i.e one candle above the other
                 if df_current_5minute_data.iloc[0].open == df_current_5minute_data.iloc[0].low and \
-                        df_current_5minute_data.iloc[0].open > pdh and df_current_1minute_data.iloc[5].open > \
-                        df_current_5minute_data.iloc[0].close:
-                    # We are not checking the current price here which is risky
-                    # We are relying on the one minute candle close value as current price here
-                    # Needs to be changed to use websocket to get current price
-                    response = o.place_order(instrument['tradingsymbol'], transaction_type="BUY", quantity=1,
-                                             order_type="SL-M", trigger_price=df_current_5minute_data.iloc[0].close,
-                                             exchange='NSE')
+                        df_current_5minute_data.iloc[0].open > pdh and df_current_5minute_data.iloc[0].close < \
+                        df_current_1minute_data.iloc[5].open < ltp:
+                    response_main = o.place_order(instrument['tradingsymbol'],
+                                                  transaction_type=KiteConnect.TRANSACTION_TYPE_BUY, quantity=1,
+                                                  order_type=KiteConnect.ORDER_TYPE_MARKET,
+                                                  exchange=KiteConnect.EXCHANGE_NSE)
                     logging.info(
-                        "Buy Order Placement Status Response :{} for instrument {}".format(response.json(), instrument))
-                    loop_flag = False
+                        "Buy Order Placement Status Response :{} for instrument {}".format(response_main.json(),
+                                                                                           instrument))
+
+                    response_sl = o.place_order(instrument['tradingsymbol'],
+                                                transaction_type=KiteConnect.TRANSACTION_TYPE_SELL, quantity=1,
+                                                order_type=KiteConnect.ORDER_TYPE_SLM,
+                                                trigger_price=df_current_5minute_data.iloc[0].close,
+                                                exchange=KiteConnect.EXCHANGE_NSE)
+                    logging.info(
+                        "Sell SL Order Placement Status Response :{} for instrument {}".format(response_sl.json(),
+                                                                                               instrument))
+
+
 
                 elif df_current_5minute_data.iloc[0].open == df_current_5minute_data.iloc[0].high and \
-                        df_current_5minute_data.iloc[0].open < pdl and df_current_1minute_data.iloc[5].open < \
-                        df_current_5minute_data.iloc[0].close:
-                    response = o.place_order(instrument['tradingsymbol'], transaction_type="SELL", quantity=1,
-                                             order_type="SL-M", trigger_price=df_current_5minute_data.iloc[0].close,
-                                             exchange='NSE')
+                        df_current_5minute_data.iloc[0].open < pdl and df_current_5minute_data.iloc[0].close > \
+                        df_current_1minute_data.iloc[5].open > ltp:
+                    response_main = o.place_order(instrument['tradingsymbol'],
+                                                  transaction_type=KiteConnect.TRANSACTION_TYPE_SELL, quantity=1,
+                                                  order_type=KiteConnect.ORDER_TYPE_MARKET,
+                                                  trigger_price=df_current_5minute_data.iloc[0].close,
+                                                  exchange=KiteConnect.EXCHANGE_NSE)
                     logging.info(
-                        "Sell Order Placement Status Response :{} for instrument {}".format(response.json(),
+                        "Sell Order Placement Status Response :{} for instrument {}".format(response_main.json(),
                                                                                             instrument))
-                    loop_flag = False
+                    response_sl = o.place_order(instrument['tradingsymbol'],
+                                                transaction_type=KiteConnect.TRANSACTION_TYPE_BUY, quantity=1,
+                                                order_type=KiteConnect.ORDER_TYPE_SLM,
+                                                trigger_price=df_current_5minute_data.iloc[0].close,
+                                                exchange=KiteConnect.EXCHANGE_NSE)
+
+                    logging.info(
+                        "Buy SL Order Placement Status Response :{} for instrument {}".format(response_sl.json(),
+                                                                                              instrument))
                 else:
-                    logging.info("Criteria not satisfied for instrument {}".format(instrument))
+                    logging.info("Open Drive Criteria not satisfied for instrument {}".format(instrument))
         logging.info("Sleeping and waiting for 9:20am")
         time.sleep(2)
 

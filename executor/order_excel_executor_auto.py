@@ -2,7 +2,7 @@ import time
 import gspread
 from utils.log import logger_instance
 from fetcher.kite.orders import Order
-from cache.aerospike import aero_client
+from cache.aerospike import aero_client, get_ltp_key
 import datetime
 
 logger = logger_instance
@@ -32,7 +32,8 @@ def execute_order():
                     if comparator == ">":
                         if ltp > trigger:
                             logger.debug(
-                                "{} as LTP: {} greater the trigger price: {} for {}".format(transaction_type, ltp, trigger,
+                                "{} as LTP: {} greater the trigger price: {} for {}".format(transaction_type, ltp,
+                                                                                            trigger,
                                                                                             trading_symbol))
                             o.place_order(trading_symbol, transaction_type, quantity)
                             i[7] = ltp  # store ltp
@@ -44,7 +45,8 @@ def execute_order():
                     elif comparator == "<":
                         if ltp < trigger:
                             logger.debug(
-                                "{} as LTP: {} smaller the trigger price: {} for {}".format(transaction_type, ltp, trigger,
+                                "{} as LTP: {} smaller the trigger price: {} for {}".format(transaction_type, ltp,
+                                                                                            trigger,
                                                                                             trading_symbol))
                             o.place_order(trading_symbol, transaction_type, quantity)
                             i[7] = ltp  # store ltp
@@ -67,7 +69,8 @@ def execute_order():
 
 
 def get_ltp(instrument):
-    return aero_client.get(instrument)['last_price']
+    key = get_ltp_key(instrument)
+    return aero_client.get(key)
 
 
 def main():
