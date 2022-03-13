@@ -171,13 +171,10 @@ def generate_data(stock, start_date, end_date):
     returns, positions, transactions, gross_lev = pyfoliozer.get_pf_items()
     returns.index = returns.index.tz_convert(None)
     import quantstats
-    # quantstats.reports.html(returns, output='stats.html', title='BTC Sentiment')
-    # quantstats.reports.full(returns)
+    quantstats.reports.html(returns, output='stats.html', title='BTC Sentiment')
+    quantstats.reports.full(returns)
     # quantstats.plots.returns(returns)
 
-    # Plot the candles on original data
-    # import mplfinance as mpf
-    # mpf.plot(df5min, type='candle', style='yahoo', volume=True)
 
     print('Final Portfolio Value: %.2f' % cerebro.broker.getvalue())
     return cerebro.broker.getvalue()
@@ -188,8 +185,8 @@ if __name__ == '__main__':
 
     stock_list = nifty_stock_list
     mtm_list = []
-    start_date = datetime.date(2021, 1, 1)
-    end_date = datetime.date(2021, 3, 28)
+    start_date = datetime.date(2021, 2, 1)
+    end_date = datetime.date(2021, 2, 28)
     # stock_list = [
     #     {"instrumenttoken": 3861249, "tradingsymbol": "ADANIPORTS"}
     # ]

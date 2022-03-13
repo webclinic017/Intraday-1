@@ -51,6 +51,7 @@ def splitter(s, index_str):
 def clean_and_save(file, index_str, con, year):
     try:
         df = pd.read_csv(file, parse_dates=[['Date', 'Time']], dayfirst=True)
+        df.drop(df[df['Ticker'].str.contains('OPTIDX_')].index, inplace=True)
         logging.info("Processing file {}".format(file))
         df[['strike', 'type', 'expiry_date']] = df.apply(lambda x: splitter(x['Ticker'], index_str),
                                                          axis=1).tolist()
@@ -85,6 +86,10 @@ def get_files(path, pattern):
 
 
 def main():
+    '''
+    python data/cleaner.py '/Volumes/HD2/OptionData/2016-21_raw/2016/' '_nifty_futures' 'NIFTY' 2016 'future'
+    python data/cleaner.py '/Volumes/HD2/OptionData/2016-21_raw/2016/' '_nifty_options' 'NIFTY' 2016 'option'
+    '''
     if len(sys.argv) < 5:
         print("Input Format Incorrect : {} {}".format(sys.argv[0],
                                                       "<path> <pattern> <index_string> <year> <future/option>"))
@@ -95,7 +100,9 @@ def main():
     year = sys.argv[4]
     future_option = sys.argv[5]
     file_list = get_files(path, pattern)
-    con = sqlite3.connect("nifty")
+    path = '/Volumes/HD2/OptionData/'
+    db_name = path + index_str + str(year) + '.db'
+    con = sqlite3.connect(db_name)
     for file in file_list:
         if future_option == "future":
             clean_and_save_futures(file, con, year)

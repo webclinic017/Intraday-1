@@ -29,9 +29,10 @@ class TestStrategy(bt.Strategy):
         print('%s, %s' % (dt.isoformat(), txt))
 
     def __init__(self):
-        # Keep a reference to the "close" line in the data[0] dataseries
-        self.dataclose = self.datas[0].close
+        self.order_close = None
+        self.order1_close = None
         self.order = None
+        self.order1 = None
 
     def notify_order(self, order):
         if order.status in [order.Submitted, order.Accepted]:
@@ -42,39 +43,57 @@ class TestStrategy(bt.Strategy):
         # Attention: broker could reject order if not enough cash
         if order.status in [order.Completed]:
             if order.isbuy():
-                self.log('BUY EXECUTED, %.2f' % order.executed.price)
+                self.log('BUY EXECUTED {} for {}'.format(order.executed.price, order.product_type))
             elif order.issell():
-                self.log('SELL EXECUTED, %.2f' % order.executed.price)
+                self.log('SELL EXECUTED {} for {}'.format(order.executed.price, order.product_type))
 
             self.bar_executed = len(self)
 
         elif order.status in [order.Canceled, order.Margin, order.Rejected]:
-            self.log('Order Canceled/Margin/Rejected')
-
-        # Write down: no pending order
-        self.order = None
+            self.log('Order Canceled/Margin/Rejected for {}'.format(order.product_type))
 
     def next(self):
-        # Simply log the closing price of the series from the reference
-        if self.order:
-            return
-
+        sl = 0.30
         # Check if we are in the market
-        if not self.position:
-
+        if (not self.getposition(self.data0)) and (not self.getposition(self.data1)):
             if self.data0.datetime.datetime().time().hour == 9 and self.data0.datetime.datetime().time().minute == 20:
-                self.log('SELL CREATE, {}  '.format(self.data0.close[0]))
-                self.log('SELL CREATE, {}'.format(self.data1.close[0]))
+                self.log('SELL CREATE, {} for {} '.format(self.data0.close[0], self.data0._name))
+                self.log('SELL CREATE, {} for {}'.format(self.data1.close[0], self.data1._name))
                 self.order = self.sell(self.data0)
+                self.order.product_type = self.data0._name
                 self.order1 = self.sell(self.data1)
+                self.order1.product_type = self.data1._name
 
         else:
 
-            if self.data0.datetime.datetime().time().hour == 15 and self.data0.datetime.datetime().time().minute == 20:
-                self.log('BUY CREATE, {}'.format(self.data0.close[0]))
-                self.log('BUY CREATE, {}'.format(self.data1.close[0]))
-                self.order = self.buy(self.data0)
-                self.order1 = self.buy(self.data1)
+            if self.data0.close[0] > (self.order.executed.price * (1 + sl)) and not self.order_close:
+                self.log('BUY CREATE, {}, {}-{} - {}'.format(self.data0.close[0], self.data0.close[0],
+                                                             self.order.executed.price * (1 + sl),
+                                                             self.order.product_type))
+                self.order_close = self.buy(self.data0)
+                self.order_close.product_type = self.data0._name
+
+            if self.data1.close[0] > (self.order1.executed.price * (1 + sl)) and not self.order1_close:
+                self.log('BUY CREATE, {}, {}-{}'.format(self.data1.close[0], self.data1.close[0],
+                                                        self.order1.executed.price * (1 + sl),
+                                                        self.order1.product_type))
+                self.order1_close = self.buy(self.data1)
+                self.order1_close.product_type = self.data1._name
+
+        if self.data0.datetime.datetime().time().hour == 15 and self.data0.datetime.datetime().time().minute == 15:
+            if not self.order_close:
+                o = self.buy(self.data0)
+                o.product_type = self.data0._name
+                self.log('BUY CREATE, {} {}'.format(self.data0.close[0], o.product_type))
+
+            if not self.order1_close:
+                o1 = self.buy(self.data1)
+                o1.product_type = self.data1._name
+                self.log('BUY CREATE, {} {}'.format(self.data1.close[0], o1.product_type))
+            self.order_close = None
+            self.order1_close = None
+            self.order = None
+            self.order1 = None
 
 
 def get_nearest_expiry(d):
@@ -85,10 +104,10 @@ def get_nearest_expiry(d):
 
 
 def straddle_strategy():
-    con = sqlite3.connect("nifty")
+    con = sqlite3.connect("/Volumes/HD2/OptionData/NIFTY2019.db")
     df_final_pe = pd.DataFrame()
     df_final_ce = pd.DataFrame()
-    datelist = pd.date_range(datetime.date(2016, 6, 1), periods=100).tolist()
+    datelist = pd.date_range(datetime.date(2019, 4, 1), periods=270).tolist()
     # d = datetime.date(2016, 6, 20)
     for d in datelist:
         d = d.date()
@@ -99,7 +118,7 @@ def straddle_strategy():
                 'Close': 'last',
                 'Volume': 'sum',
                 'oi': 'sum'}
-        df_fut = pd.read_sql_query("SELECT * from nifty_futures_2016 where ticker = ? and date(Date_Time) = date(?)",
+        df_fut = pd.read_sql_query("SELECT * from nifty_futures_2019 where ticker = ? and date(Date_Time) = date(?)",
                                    con, params=["NIFTY-I", d], parse_dates=True, index_col='Date_Time')
         if df_fut.empty:
             continue
@@ -109,18 +128,25 @@ def straddle_strategy():
         close = df5_fut.iloc[1].Close
         atm_strike = round(close / 100) * 100  # round to nearest 100
         logging.info("Reading data for {}".format(d))
+        logging.info("Picking atm strike {} for expiry {}".format(atm_strike, d1))
         df_opt_pe = pd.read_sql_query(
-            "SELECT * from nifty_options_2016 where strike = ? and date(Date_Time) = date(?) and expiry_date = ? and type = ?",
+            "SELECT * from nifty_options_2019 where strike = ? and date(Date_Time) = date(?) and expiry_date = ? and type = ?",
             con, params=[atm_strike, d, d1, 'PE'], parse_dates=True, index_col='Date_Time')
         df_opt_ce = pd.read_sql_query(
-            "SELECT * from nifty_options_2016 where strike = ? and date(Date_Time) = date(?) and expiry_date = ? and type = ?",
+            "SELECT * from nifty_options_2019 where strike = ? and date(Date_Time) = date(?) and expiry_date = ? and type = ?",
             con, params=[atm_strike, d, d1, 'CE'], parse_dates=True, index_col='Date_Time')
 
         df_opt_pe.index = pd.to_datetime(df_opt_pe.index)
+        df_opt_pe = df_opt_pe.sort_index()
         df5_opt_pe = df_opt_pe.resample('5min').apply(ohlc)
 
         df_opt_ce.index = pd.to_datetime(df_opt_ce.index)
+        df_opt_ce = df_opt_ce.sort_index()
         df5_opt_ce = df_opt_ce.resample('5min').apply(ohlc)
+        #skip the day if first tick is not at 9:15
+        if df_opt_ce.index[0].minute != 15 or df_opt_pe.index[0].minute != 15:
+            continue
+
         df_final_ce = df_final_ce.append(df5_opt_ce)
         df_final_pe = df_final_pe.append(df5_opt_pe)
 
@@ -131,24 +157,20 @@ def straddle_strategy():
     cerebro.adddata(data_pe, name='PE')
     cerebro.adddata(data_ce, name='CE')
     cerebro.addstrategy(TestStrategy)
-    cerebro.addanalyzer(bt.analyzers.PyFolio)
+    cerebro.addsizer(bt.sizers.SizerFix, stake=50)
+    cerebro.addanalyzer(bt.analyzers.PyFolio, _name='pyfolio')
+    cerebro.broker.setcash(200000.0)
     print("Run start")
 
     strats = cerebro.run()
 
     pyfolio = strats[0].analyzers.getbyname('pyfolio')
     returns, positions, transactions, gross_lev = pyfolio.get_pf_items()
-    print(returns,positions,transactions)
-    import pyfolio as pf
-    # pf.create_full_tear_sheet(
-    #     returns,
-    #     positions=positions,
-    #     transactions=transactions,
-    #     live_start_date='2016-06-1',
-    #     round_trips=True)
-
+    returns.index = returns.index.tz_convert(None)
+    import quantstats as qs
+    qs.extend_pandas()
+    qs.reports.html(returns, output='backtester/stats.html', title='Straddle Sentiment')
     portvalue = cerebro.broker.getvalue()
-    #cerebro.plot()
     # Print out the final result
     print('Final Portfolio Value: ${}'.format(portvalue))
     print("Run finish")

@@ -8,3 +8,4 @@ log/*.log
 *.db
 *.ipynb
 .ipynb_checkpoints/
+*tearsheet.html

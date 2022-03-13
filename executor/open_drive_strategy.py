@@ -59,6 +59,15 @@ def open_drive_execute(instrument_list):
                                                                 "volume", "oi"])
                 key = get_ltp_key(instrument['instrumenttoken'])
                 ltp = aero_client.get(key)
+                logging.info(
+                    "PDH:{}, PDL:{}, Open 5min:{}, Close 5min:{}, Open 1min:{}, LTP:{} for  {}".format(pdh, pdl,
+                                                                                                       df_current_5minute_data.iloc[
+                                                                                                           0].close,
+                                                                                                       df_current_5minute_data.iloc[
+                                                                                                           0].open,
+                                                                                                       df_current_1minute_data.iloc[
+                                                                                                           5].open, ltp,
+                                                                                                       instrument))
                 # if the first 5 minute candle opens with low=close and is above pdh and
                 # 6th 1 minute candle open is above the close of 1st 5 minute candle
                 # candle to candle stop loss i.e close of first 5 minute candle is SL
