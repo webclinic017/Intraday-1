@@ -4,6 +4,7 @@ from utils.log import logger_instance
 from fetcher.kite.orders import Order
 from cache.aerospike import aero_client, get_ltp_key
 import datetime
+from kiteconnect import KiteConnect
 
 logger = logger_instance
 
@@ -17,7 +18,7 @@ def execute_order():
     while True:
         try:
             logger.debug("Polling on Sheet for Auto orders")
-            ex_list = ws.get_values('A3:I12')
+            ex_list = ws.get_values('A3:I34')
             for i in ex_list:
                 if i[6] == '1':
                     trading_symbol = i[0]
@@ -35,12 +36,13 @@ def execute_order():
                                 "{} as LTP: {} greater the trigger price: {} for {}".format(transaction_type, ltp,
                                                                                             trigger,
                                                                                             trading_symbol))
-                            o.place_order(trading_symbol, transaction_type, quantity)
+                            o.place_order(trading_symbol, transaction_type, quantity, exchange=KiteConnect.EXCHANGE_NFO)
                             i[7] = ltp  # store ltp
                             i[8] = str(datetime.datetime.now())
                             # cancel all upcoming trades after an order gets placed - safety net
-                            for j in ex_list:
-                                j[6] = '0'
+                            # for j in ex_list:
+                            #     j[6] = '0'
+                            i[6] = '0'
                             update_flag = True
                     elif comparator == "<":
                         if ltp < trigger:
@@ -48,12 +50,13 @@ def execute_order():
                                 "{} as LTP: {} smaller the trigger price: {} for {}".format(transaction_type, ltp,
                                                                                             trigger,
                                                                                             trading_symbol))
-                            o.place_order(trading_symbol, transaction_type, quantity)
+                            o.place_order(trading_symbol, transaction_type, quantity,exchange=KiteConnect.EXCHANGE_NFO)
                             i[7] = ltp  # store ltp
                             i[8] = str(datetime.datetime.now())
                             # cancel all upcoming trades after an order gets placed - safety net
-                            for j in ex_list:
-                                j[6] = '0'
+                            # for j in ex_list:
+                            #     j[6] = '0'
+                            i[6] = '0'
                             update_flag = True
             if update_flag:
                 ws.update('A3:I12', ex_list)

@@ -6,6 +6,7 @@ from utils.log import logger_instance
 logging = logger_instance
 
 
+# TODO incremental download which picks last date from DB and starts download from thatd ate until yestrday
 def main():
     """
   -Downloads data from start to end range in chunks of  1 month and save in sqlite DB

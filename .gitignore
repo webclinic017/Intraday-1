@@ -9,3 +9,4 @@ log/*.log
 *.ipynb
 .ipynb_checkpoints/
 *tearsheet.html
+*stats.html

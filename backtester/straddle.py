@@ -1,24 +1,17 @@
 import sqlite3, datetime, backtrader as bt
 import pandas as pd
-from dateutil.parser import parse
-from conf.expiry_dates import sorted_expiry_dates
 from utils.log import logger_instance
+from utils.misc import get_nearest_expiry
+import plotly.graph_objects as go
+import quantstats as qs
 
 logging = logger_instance
 
-# start preparing the DF
-# get distinct expiry date list for the year and store in a list
-# Loop start at date level , re-sample the 1 minute to 5 minute and fetch the 5 minutes futures DF
-# From the futures price calculate the ATM strike
-# Use the ATM price and get the nearest strike for CE/PE from DB using the expiry date list , this is the working DF
-# Feed this DF to the Strategy
-# Within the Strategy next() method if the candle time is 09:20 then sell PE and CE and set 30% as SL
-# Within the Strategy next() method if the candle time is 03:15 then buy PE and CE if not already bought
-# Plot the graph
 
-
-from backtesting import Strategy, Backtest
-import numpy as np
+# Strategy Details:
+# Simple straddle where we take position at 9:20 and sell at 15:15 if SL's are not hit on any leg
+# If any leg has a SL hit of 30% then we exit only that leg and wait for other leg to get squared off on SL or
+# at 15:15
 
 
 class TestStrategy(bt.Strategy):
@@ -54,6 +47,10 @@ class TestStrategy(bt.Strategy):
 
     def next(self):
         sl = 0.30
+        # skip mondays
+        if self.data0.datetime.datetime().date().weekday() == 0:
+            return
+
         # Check if we are in the market
         if (not self.getposition(self.data0)) and (not self.getposition(self.data1)):
             if self.data0.datetime.datetime().time().hour == 9 and self.data0.datetime.datetime().time().minute == 20:
@@ -96,45 +93,42 @@ class TestStrategy(bt.Strategy):
             self.order1 = None
 
 
-def get_nearest_expiry(d):
-    for i in sorted_expiry_dates:
-        x = parse(i).date()
-        if x >= d:
-            return x
-
-
 def straddle_strategy():
-    con = sqlite3.connect("/Volumes/HD2/OptionData/NIFTY2019.db")
+    con = sqlite3.connect("/Volumes/HD2/OptionData/NIFTY2020.db")
+    con1 = sqlite3.connect("/Volumes/HD2/OptionData/NIFTY50.db")
     df_final_pe = pd.DataFrame()
     df_final_ce = pd.DataFrame()
-    datelist = pd.date_range(datetime.date(2019, 4, 1), periods=270).tolist()
-    # d = datetime.date(2016, 6, 20)
+    datelist = pd.date_range(datetime.date(2020, 1, 1), periods=365).tolist()
+    start_date = str(datelist[0].date())
+    end_date = str(datelist[-1].date())
     for d in datelist:
         d = d.date()
         d1 = get_nearest_expiry(d)
-        ohlc = {'Open': 'first',
-                'High': 'max',
-                'Low': 'min',
-                'Close': 'last',
-                'Volume': 'sum',
+        ohlc = {'open': 'first',
+                'high': 'max',
+                'low': 'min',
+                'close': 'last',
+                'volume': 'sum',
                 'oi': 'sum'}
-        df_fut = pd.read_sql_query("SELECT * from nifty_futures_2019 where ticker = ? and date(Date_Time) = date(?)",
-                                   con, params=["NIFTY-I", d], parse_dates=True, index_col='Date_Time')
+        # df_fut = pd.read_sql_query("SELECT * from nifty_futures_2019 where ticker = ? and date(date) = date(?)",
+        #                            con, params=["NIFTY-I", d], parse_dates=True, index_col='date')
+        df_fut = pd.read_sql_query("SELECT * from nifty where date(date) = date(?)",
+                                   con1, params=[d], parse_dates=True, index_col='date')
         if df_fut.empty:
             continue
         df_fut.index = pd.to_datetime(df_fut.index)
         df5_fut = df_fut.resample('5min').apply(ohlc)
 
-        close = df5_fut.iloc[1].Close
-        atm_strike = round(close / 100) * 100  # round to nearest 100
+        close = df_fut.iloc[1].close
+        atm_strike = round(close / 50) * 50  # round to nearest 100
         logging.info("Reading data for {}".format(d))
         logging.info("Picking atm strike {} for expiry {}".format(atm_strike, d1))
         df_opt_pe = pd.read_sql_query(
-            "SELECT * from nifty_options_2019 where strike = ? and date(Date_Time) = date(?) and expiry_date = ? and type = ?",
-            con, params=[atm_strike, d, d1, 'PE'], parse_dates=True, index_col='Date_Time')
+            "SELECT * from nifty_options_2020 where strike = ? and date(date) = date(?) and expiry_date = ? and type = ?",
+            con, params=[atm_strike, d, d1, 'PE'], parse_dates=True, index_col='date')
         df_opt_ce = pd.read_sql_query(
-            "SELECT * from nifty_options_2019 where strike = ? and date(Date_Time) = date(?) and expiry_date = ? and type = ?",
-            con, params=[atm_strike, d, d1, 'CE'], parse_dates=True, index_col='Date_Time')
+            "SELECT * from nifty_options_2020 where strike = ? and date(date) = date(?) and expiry_date = ? and type = ?",
+            con, params=[atm_strike, d, d1, 'CE'], parse_dates=True, index_col='date')
 
         df_opt_pe.index = pd.to_datetime(df_opt_pe.index)
         df_opt_pe = df_opt_pe.sort_index()
@@ -143,12 +137,12 @@ def straddle_strategy():
         df_opt_ce.index = pd.to_datetime(df_opt_ce.index)
         df_opt_ce = df_opt_ce.sort_index()
         df5_opt_ce = df_opt_ce.resample('5min').apply(ohlc)
-        #skip the day if first tick is not at 9:15
-        if df_opt_ce.index[0].minute != 15 or df_opt_pe.index[0].minute != 15:
+        # skip the day if first tick is not at 9:15
+        if not df_opt_ce.empty and (df_opt_ce.index[0].minute != 15 or df_opt_pe.index[0].minute != 15):
             continue
 
-        df_final_ce = df_final_ce.append(df5_opt_ce)
-        df_final_pe = df_final_pe.append(df5_opt_pe)
+        df_final_ce = df_final_ce.append(df_opt_ce)
+        df_final_pe = df_final_pe.append(df_opt_pe)
 
     cerebro = bt.Cerebro()
 
@@ -159,7 +153,8 @@ def straddle_strategy():
     cerebro.addstrategy(TestStrategy)
     cerebro.addsizer(bt.sizers.SizerFix, stake=50)
     cerebro.addanalyzer(bt.analyzers.PyFolio, _name='pyfolio')
-    cerebro.broker.setcash(200000.0)
+
+    cerebro.broker.setcash(150000.0)
     print("Run start")
 
     strats = cerebro.run()
@@ -167,9 +162,29 @@ def straddle_strategy():
     pyfolio = strats[0].analyzers.getbyname('pyfolio')
     returns, positions, transactions, gross_lev = pyfolio.get_pf_items()
     returns.index = returns.index.tz_convert(None)
-    import quantstats as qs
+    con1 = sqlite3.connect("/Volumes/HD2/OptionData/VIX.db")
+    df_vix = pd.read_sql_query(
+        "SELECT * from vix where date(date) >= date(?) and date(date) <= date(?)",
+        con1, params=[start_date, end_date], parse_dates=True, index_col='date')
+    ohlc = {'open': 'first',
+            'high': 'max',
+            'low': 'min',
+            'close': 'last',
+            'volume': 'sum'}
+
+    df_vix.index = pd.to_datetime(df_vix.index)
+    df_vix = df_vix.tz_localize(None)
+    df1day = df_vix.resample('1D').apply(ohlc)
+    df1day.dropna(inplace=True)
     qs.extend_pandas()
-    qs.reports.html(returns, output='backtester/stats.html', title='Straddle Sentiment')
+    qs.reports.html(returns, output='backtester/stats.html', download_filename='backtester/stats.html',
+                    title='Simple Straddle')
+    test = returns.apply(lambda x: x * 100)
+    vix = df1day.open.apply(lambda x: x / 100)
+    fig = go.Figure(data=[
+        go.Scatter(x=test.index, y=vix, line=dict(color='black', width=1), name="VIX", mode="lines+markers"),
+        go.Scatter(x=test.index, y=test, line=dict(color='blue', width=1), name="Returns", mode="lines+markers")])
+    fig.show()
     portvalue = cerebro.broker.getvalue()
     # Print out the final result
     print('Final Portfolio Value: ${}'.format(portvalue))
