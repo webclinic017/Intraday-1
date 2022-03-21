@@ -19,13 +19,20 @@ class Order(object):
             'Accept-Language': 'en-us',
             'Host': 'kite.zerodha.com',
             'Origin': 'https://kite.zerodha.com',
-            'Content-Length': '240',
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_2) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.4 Safari/605.1.15',
-            'Referer': 'https://kite.zerodha.com/chart/web/ciq/INDICES/NIFTY%2050/256265',
-            'Connection': 'keep-alive',
+            'Referer': 'https://kite.zerodha.com/positions',
             'X-Kite-Version': '2.9.2',
             'X-Kite-Userid': username,
         }
+
+
+    def get_positions(self):
+        logger.info("Getting position details")
+        url = 'https://kite.zerodha.com/oms/portfolio/positions'
+        response = requests.get(url, headers=self.headers)
+        logger.debug("Position Details  Status:{}, Response:{}".format(response.status_code, response.json()))
+        if response.status_code == 200:
+            return response
 
     def place_order(self, trading_symbol, transaction_type=KiteConnect.TRANSACTION_TYPE_BUY, quantity=0,
                     order_type=KiteConnect.ORDER_TYPE_MARKET, trigger_price=0,

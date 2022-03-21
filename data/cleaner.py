@@ -1,5 +1,6 @@
 import re, os, sys, sqlite3
 import pandas as pd
+import pandas_ta as ta
 import datetime
 from dateutil.parser import parse
 from utils.log import logger_instance
@@ -60,6 +61,7 @@ def clean_and_save(file, index_str, con, year):
     try:
         df = pd.read_csv(file, parse_dates=[['Date', 'Time']], dayfirst=True)
         df.drop(df[df['Ticker'].str.contains('OPTIDX_')].index, inplace=True)
+        df.drop(df[df['Ticker'].str.contains('FINNIFTY')].index, inplace=True)
         logging.info("Processing file {}".format(file))
         df[['strike', 'type', 'expiry_date']] = df.apply(lambda x: splitter(x['Ticker'], index_str),
                                                          axis=1).tolist()

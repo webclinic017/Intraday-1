@@ -18,7 +18,7 @@ def execute_order():
     while True:
         try:
             logger.debug("Polling on Sheet for Auto orders")
-            ex_list = ws.get_values('A3:I34')
+            ex_list = ws.get_values('A3:I18')
             for i in ex_list:
                 if i[6] == '1':
                     trading_symbol = i[0]
@@ -59,14 +59,14 @@ def execute_order():
                             i[6] = '0'
                             update_flag = True
             if update_flag:
-                ws.update('A3:I12', ex_list)
+                ws.update('A3:I18', ex_list)
                 update_flag = False
             time.sleep(2)
         except Exception as e:
             logger.exception("Exception detected - cancelling all open orders {}".format(e))
             for j in ex_list:
                 j[6] = '0'
-            ws.update('A3:I12', ex_list)
+            ws.update('A3:I18', ex_list)
             time.sleep(5)
             logger.debug("Sleeping for {} seconds due to exception".format(5))
 

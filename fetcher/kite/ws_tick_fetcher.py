@@ -7,11 +7,62 @@ from conf.nifty_stocks import nifty_stock_list
 logger = logger_instance
 import sys
 
-nifty_instrument_token = 256265
+nifty_instrument_token = [256265]
 
-instrument_list = [x['instrumenttoken'] for x in nifty_stock_list]
+strike_list = [
+    13807618,
+    13807874,
+    13808130,
+    13808386,
+    13808642,
+    13808898,
+    13809154,
+    13809410,
+    13810178,
+    13810434,
+    13813250,
+    13813506,
+    13813762,
+    13814018,
+    13814274,
+    13814530,
+    13817858,
+    13818114,
+    13818370,
+    13818626,
+    13821954,
+    13822210,
+    13826050,
+    13826306,
+    13826562,
+    13826818,
+    13827074,
+    13827330,
+    13827586,
+    13827842,
+    13828866,
+    13829122,
+    13830146,
+    13830402,
+    13833218,
+    13833986,
+    13840642,
+    13840898,
+    13841154,
+    13842946,
+    13845762,
+    13848834,
+    13850114,
+    13851650
+]
 
-instrument_list.append(nifty_instrument_token)
+nifty_stocks = [x['instrumenttoken'] for x in nifty_stock_list]
+
+#instrument_list = nifty_stocks + strike_list + nifty_instrument_token
+#instrument_list = nifty_stocks  + nifty_instrument_token
+
+instrument_list = nifty_instrument_token + strike_list
+
 
 
 class KT(KiteTicker):
@@ -24,7 +75,7 @@ class KT(KiteTicker):
 def on_ticks(ws, ticks):  # noqa
     # logger.debug(ticks)
     for i in ticks:
-        key  = get_ltp_key(i['instrument_token'])
+        key = get_ltp_key(i['instrument_token'])
         aero_client.put(key, i['last_price'])
 
 

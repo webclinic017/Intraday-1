@@ -1,5 +1,6 @@
 import sqlite3, datetime, backtrader as bt
 import pandas as pd
+import pandas_ta as ta
 from utils.log import logger_instance
 from utils.misc import get_nearest_expiry
 import plotly.graph_objects as go
@@ -47,6 +48,8 @@ class TestStrategy(bt.Strategy):
 
     def next(self):
         sl = 0.30
+        sl_pe = self.data0.atr * 2
+        sl_ce = self.data1.atr * 2
         # skip mondays
         if self.data0.datetime.datetime().date().weekday() == 0:
             return
@@ -94,11 +97,11 @@ class TestStrategy(bt.Strategy):
 
 
 def straddle_strategy():
-    con = sqlite3.connect("/Volumes/HD2/OptionData/NIFTY2020.db")
+    con = sqlite3.connect("/Volumes/HD2/OptionData/NIFTY2021.db")
     con1 = sqlite3.connect("/Volumes/HD2/OptionData/NIFTY50.db")
     df_final_pe = pd.DataFrame()
     df_final_ce = pd.DataFrame()
-    datelist = pd.date_range(datetime.date(2020, 1, 1), periods=365).tolist()
+    datelist = pd.date_range(datetime.date(2021, 1, 1), periods=30).tolist()
     start_date = str(datelist[0].date())
     end_date = str(datelist[-1].date())
     for d in datelist:
@@ -124,18 +127,21 @@ def straddle_strategy():
         logging.info("Reading data for {}".format(d))
         logging.info("Picking atm strike {} for expiry {}".format(atm_strike, d1))
         df_opt_pe = pd.read_sql_query(
-            "SELECT * from nifty_options_2020 where strike = ? and date(date) = date(?) and expiry_date = ? and type = ?",
+            "SELECT * from nifty_options_2021 where strike = ? and date(date) = date(?) and expiry_date = ? and type = ?",
             con, params=[atm_strike, d, d1, 'PE'], parse_dates=True, index_col='date')
         df_opt_ce = pd.read_sql_query(
-            "SELECT * from nifty_options_2020 where strike = ? and date(date) = date(?) and expiry_date = ? and type = ?",
+            "SELECT * from nifty_options_2021 where strike = ? and date(date) = date(?) and expiry_date = ? and type = ?",
             con, params=[atm_strike, d, d1, 'CE'], parse_dates=True, index_col='date')
 
         df_opt_pe.index = pd.to_datetime(df_opt_pe.index)
         df_opt_pe = df_opt_pe.sort_index()
+        df_opt_pe['atr'] = ta.atr(df_opt_pe.high, df_opt_pe.low, df_opt_pe.close, length=14)
         df5_opt_pe = df_opt_pe.resample('5min').apply(ohlc)
 
         df_opt_ce.index = pd.to_datetime(df_opt_ce.index)
         df_opt_ce = df_opt_ce.sort_index()
+        df_opt_ce['atr'] = ta.atr(df_opt_ce.high, df_opt_ce.low, df_opt_ce.close, length=14)
+
         df5_opt_ce = df_opt_ce.resample('5min').apply(ohlc)
         # skip the day if first tick is not at 9:15
         if not df_opt_ce.empty and (df_opt_ce.index[0].minute != 15 or df_opt_pe.index[0].minute != 15):
