@@ -52,6 +52,7 @@ class TestStrategy(bt.Strategy):
                 continue
             else:
                 break
+        # if i == 4 then previous day data is not found
         if i == 4:
             return
             # Check if an order is pending ... if yes, we cannot send a 2nd one
@@ -174,7 +175,6 @@ def generate_data(stock, start_date, end_date):
     quantstats.reports.html(returns, output='stats.html', title='BTC Sentiment')
     quantstats.reports.full(returns)
     # quantstats.plots.returns(returns)
-
 
     print('Final Portfolio Value: %.2f' % cerebro.broker.getvalue())
     return cerebro.broker.getvalue()

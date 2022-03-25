@@ -7,6 +7,7 @@ import time
 from fetcher.kite.orders import Order
 from utils.log import logger_instance
 from conf.nifty_stocks import nifty_stock_list
+from cache.sqllite_cache import Sqllite
 import time, sys
 
 logging = logger_instance
@@ -37,6 +38,8 @@ def get_previous_day_data(instrument, current_date):
 def open_drive_execute(instrument_list):
     current_date = datetime.datetime.now().date()
     o = Order()
+    sql = Sqllite()
+    sql.init_ltp_db()
     loop_flag = True
     while True:
         if not loop_flag:
@@ -57,8 +60,7 @@ def open_drive_execute(instrument_list):
                 df_current_1minute_data = pd.DataFrame(current_1minute_data,
                                                        columns=["date", "open", "high", "low", "close",
                                                                 "volume", "oi"])
-                key = get_ltp_key(instrument['instrumenttoken'])
-                ltp = aero_client.get(key)
+                ltp = sql.get_ltp(instrument['instrumenttoken'])
                 logging.info(
                     "PDH:{}, PDL:{}, Open 5min:{}, Close 5min:{}, Open 1min:{}, LTP:{} for  {}".format(pdh, pdl,
                                                                                                        df_current_5minute_data.iloc[

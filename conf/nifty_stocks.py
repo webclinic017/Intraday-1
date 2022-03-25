@@ -47,4 +47,61 @@ nifty_stock_list = [{"instrumenttoken": 3861249, "tradingsymbol": "ADANIPORTS"},
                     {"instrumenttoken": 784129, "tradingsymbol": "VEDL"},
                     {"instrumenttoken": 969473, "tradingsymbol": "WIPRO"},
                     {"instrumenttoken": 3050241, "tradingsymbol": "YESBANK"},
-                    {"instrumenttoken": 975873, "tradingsymbol": "ZEEL"}]
+                    {"instrumenttoken": 975873, "tradingsymbol": "ZEEL"}
+                    ]
+
+nifty_indices = [
+    {"instrumenttoken": 256265, "tradingsymbol": "NIFTY 50"},
+    {"instrumenttoken": 260105, "tradingsymbol": "NIFTY BANK"}
+
+]
+
+# grep 2022-03-24 instruments.csv | grep NIFTY | grep -v BANK | grep "16[5-9][0-5]0"
+# grep 2022-03-24 instruments.csv | grep NIFTY | grep -v BANK | grep "17[0-5][0-5]0"
+
+nifty_expiry_strikes = [13160962,
+                        13161218,
+                        14982658,
+                        14982914,
+                        14983170,
+                        14983426,
+                        14983682,
+                        14983938,
+                        14984194,
+                        14984450,
+                        14984706,
+                        14984962,
+                        14985218,
+                        14985474,
+                        14985730,
+                        14985986,
+                        14986242,
+                        14986498,
+                        14986754,
+                        14987010,
+                        9447170,
+                        9449218,
+                        14987266,
+                        14987522,
+                        13151490,
+                        13156866,
+                        14973698,
+                        14973954,
+                        14974722,
+                        14974978,
+                        14975490,
+                        14975746,
+                        14976514,
+                        14976770,
+                        14978306,
+                        14978562,
+                        14978818,
+                        14979074,
+                        14981122,
+                        14981378,
+                        14981634,
+                        14981890,
+                        14982146,
+                        14982402
+
+                        ]

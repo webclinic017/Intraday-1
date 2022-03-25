@@ -1,8 +1,9 @@
-import time, datetime
+import time, datetime, sys
 from fetcher.kite.orders import Order
 from kiteconnect import KiteConnect
 from utils.log import logger_instance
 from cache.aerospike import aero_client, get_ltp_key
+from cache.sqllite_cache import Sqllite
 
 logging = logger_instance
 
@@ -14,9 +15,9 @@ logging = logger_instance
 o = Order()
 
 
-def square_off_positions(open_buy_positions, open_sell_positions):
+def square_off_positions(open_buy_positions, open_sell_positions, sl):
     for pos in open_buy_positions:
-        logging.info("Closing all open BUY positions as SL of {} is hit".format(sl))
+        logging.info("Closing all open BUY positions as SL/TP of {} is hit".format(sl))
         tradingsymbol = pos['tradingsymbol']
         transaction_type = KiteConnect.TRANSACTION_TYPE_SELL
         quantity = abs(pos['quantity'])
@@ -25,7 +26,7 @@ def square_off_positions(open_buy_positions, open_sell_positions):
                       exchange=exchange)
 
     for pos in open_sell_positions:
-        logging.info("Closing all open SELL positions as SL of {} is hit".format(sl))
+        logging.info("Closing all open SELL positions as SL/TP of {} is hit".format(sl))
         tradingsymbol = pos['tradingsymbol']
         transaction_type = KiteConnect.TRANSACTION_TYPE_BUY
         quantity = abs(pos['quantity'])
@@ -36,17 +37,20 @@ def square_off_positions(open_buy_positions, open_sell_positions):
 
 def calculate_running_profit_loss():
     exclude_symbol_list = []
-    capital = 300000
+    capital = 250000
     sl_percent = 0.01
     tp_percent = 0.015
     sl = capital * sl_percent * -1
     # tp = capital * tp_percent
     tp = None
+    sql = Sqllite()
+    sql.init_ltp_db()
     pos = o.get_positions().json()
     while True:
         dat = datetime.datetime.now()
         # call positions api once a minute only
         if dat.second == 59:
+            # clear position here so that old position is not used
             pos = None
             pos = o.get_positions().json()
             time.sleep(1)
@@ -57,8 +61,9 @@ def calculate_running_profit_loss():
             for x in pos['data']['day']:
                 if x['tradingsymbol'] in exclude_symbol_list:
                     continue
-                key = get_ltp_key(x['instrument_token'])
-                ltp = aero_client.get(key)
+                # key = get_ltp_key(x['instrument_token'])
+                # ltp = aero_client.get(key)
+                ltp = sql.get_ltp(x['instrument_token'],100000)
                 pnl = (x['sell_value'] - x['buy_value']) + (x['quantity'] * ltp * x['multiplier'])
                 if x['quantity'] < 0:
                     open_sell_positions.append(x)
@@ -69,12 +74,14 @@ def calculate_running_profit_loss():
             logging.info("Total PNL {}".format(total_pnl))
             # Close all open positions if loss/profit is around X% of capital
             if total_pnl < sl:
-                square_off_positions(open_buy_positions, open_sell_positions)
+                square_off_positions(open_buy_positions, open_sell_positions, sl)
+                break
             if tp and total_pnl > tp:
-                square_off_positions(open_buy_positions, open_sell_positions)
+                square_off_positions(open_buy_positions, open_sell_positions, tp)
+                break
         else:
             logging.info("Error getting positions")
-        #if you change sleep then change 59 to even number above in the loop
+        # if you change sleep then change 59 to even number above in the loop
         time.sleep(1)
 
 
