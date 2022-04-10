@@ -30,5 +30,4 @@ def fetch_http_ohlc(stock, from_date=None, to_date=None, period="15minute"):
     json_data = {}
     if response.status_code == 200:
         json_data = response.json()
-
-    return json_data['data']['candles']
+        return json_data['data']['candles']

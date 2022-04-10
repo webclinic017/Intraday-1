@@ -57,14 +57,12 @@ def splitter(s, index_str):
         return "", "", None
 
 
-def clean_and_save(file, index_str, con, year):
+def clean_and_save(file, index_str, con, year, resample=None):
     try:
         df = pd.read_csv(file, parse_dates=[['Date', 'Time']], dayfirst=True)
         df.drop(df[df['Ticker'].str.contains('OPTIDX_')].index, inplace=True)
         df.drop(df[df['Ticker'].str.contains('FINNIFTY')].index, inplace=True)
         logging.info("Processing file {}".format(file))
-        df[['strike', 'type', 'expiry_date']] = df.apply(lambda x: splitter(x['Ticker'], index_str),
-                                                         axis=1).tolist()
         df = df.rename(
             columns={"Open Interest": "oi", "Open": "open", "Close": "close", "High": "high", "Volume": "volume",
                      "Date_Time": "date", "Ticker": "ticker", "Low": "low"})
@@ -72,7 +70,14 @@ def clean_and_save(file, index_str, con, year):
         df.columns = df.columns.str.strip()
         df.index = pd.to_datetime(df.date)
         df.drop(['date'], axis=1, inplace=True)
-        df.to_sql('nifty_options_' + year, con, if_exists='append')
+        if resample:
+            df = df.groupby('ticker').resample(resample).apply(ohlc).reset_index()
+            df.index = pd.to_datetime(df.date)
+            df.drop(['date'], axis=1, inplace=True)
+        df[['strike', 'type', 'expiry_date']] = df.apply(lambda x: splitter(x['ticker'], index_str),
+                                                         axis=1).tolist()
+
+        df.to_sql('nifty_options_' + year + resample, con, if_exists='append')
     except Exception as e:
         logging.exception("Exception on processing file {}".format(file, e))
 
@@ -107,17 +112,18 @@ def get_files(path, pattern):
 def main():
     '''
     python data/cleaner.py '/Volumes/HD2/OptionData/2016-21_raw/2016/' '_nifty_futures' 'NIFTY' 2016 'future'
-    python data/cleaner.py '/Volumes/HD2/OptionData/2016-21_raw/2016/' '_nifty_options' 'NIFTY' 2016 'option'
+    python data/cleaner.py '/Volumes/HD2/OptionData/2016-21_raw/2016/' '_nifty_options' 'NIFTY' 2016 'option' '5min'
     '''
     if len(sys.argv) < 5:
         print("Input Format Incorrect : {} {}".format(sys.argv[0],
-                                                      "<path> <pattern> <index_string> <year> <future/option>"))
+                                                      "<path> <pattern> <index_string> <year> <future/option> [5min]"))
         exit(1)
     path = sys.argv[1]
     pattern = sys.argv[2]
     index_str = sys.argv[3]
     year = sys.argv[4]
     future_option = sys.argv[5]
+    resample = sys.argv[6] if sys.argv[6] else None
     file_list = get_files(path, pattern)
     path = '/Volumes/HD2/OptionData/'
     db_name = path + index_str + str(year) + '.db'
@@ -126,8 +132,10 @@ def main():
         if future_option == "future":
             clean_and_save_futures(file, con, year)
         elif future_option == "option":
-            clean_and_save(file, index_str, con, year)
+            clean_and_save(file, index_str, con, year, resample)
     con.execute("CREATE INDEX ix_nifty_options_expiry_date ON  nifty_options_{}(expiry_date)".format(year))
+    if resample:
+        con.execute("CREATE INDEX ix_nifty_options_expiry_date1 ON  nifty_options_{}5min(expiry_date)".format(year))
     con.close()
 
 

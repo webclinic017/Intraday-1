@@ -1,4 +1,7 @@
 import sqlite3, datetime
+from utils.log import logger_instance
+
+logging = logger_instance
 
 
 class Sqllite(object):
@@ -9,6 +12,7 @@ class Sqllite(object):
         self.cursor = self.con.cursor()
         self.cursor.execute(
             "CREATE TABLE IF NOT EXISTS price (name text PRIMARY KEY ,ltp integer,time_stamp DATE DEFAULT (datetime('now','localtime')))")
+        self.cursor.execute("CREATE INDEX IF NOT EXISTS price_index on price (name)")
         self.con.commit()
 
     def get_ltp(self, name, time_window=15):

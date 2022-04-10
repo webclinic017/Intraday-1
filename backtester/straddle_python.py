@@ -29,10 +29,10 @@ class TestStrategy(bt.Strategy):
         self.order1 = None
         self.straddle_underlying_price = None
         self.rolling_dict = {
-            "ATM_CE": ['LOWER_PE1', 'LOWER_CE1', 'UPPER_PE1', 'UPPER_CE1']
-            "LOWER_CE1": ['LOWER_PE2', 'LOWER_CE2', 'ATM_PE', 'ATM_CE']
-            "LOWER_CE2": ['LOWER_PE3', 'LOWER_CE3', 'LOWER_PE1', 'LOWER_CE1']
-            "UPPER_CE1": ['ATM_CE', 'ATM_PE', 'UPPER_PE2', 'UPPER_CE2']
+            "ATM_CE": ['LOWER_PE1', 'LOWER_CE1', 'UPPER_PE1', 'UPPER_CE1'],
+            "LOWER_CE1": ['LOWER_PE2', 'LOWER_CE2', 'ATM_PE', 'ATM_CE'],
+            "LOWER_CE2": ['LOWER_PE3', 'LOWER_CE3', 'LOWER_PE1', 'LOWER_CE1'],
+            "UPPER_CE1": ['ATM_CE', 'ATM_PE', 'UPPER_PE2', 'UPPER_CE2'],
             "UPPER_CE2": ['UPPER_PE1', 'UPPER_CE1', 'UPPER_PE3', 'UPPER_CE3']
         }
 

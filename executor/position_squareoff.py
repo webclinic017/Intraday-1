@@ -2,7 +2,6 @@ import time, datetime, sys
 from fetcher.kite.orders import Order
 from kiteconnect import KiteConnect
 from utils.log import logger_instance
-from cache.aerospike import aero_client, get_ltp_key
 from cache.sqllite_cache import Sqllite
 
 logging = logger_instance
@@ -36,8 +35,9 @@ def square_off_positions(open_buy_positions, open_sell_positions, sl):
 
 
 def calculate_running_profit_loss():
-    exclude_symbol_list = []
-    capital = 250000
+    exclude_symbol_list = ['HINDALCO']
+    underlying_instrument = 256265
+    capital = 200000
     sl_percent = 0.01
     tp_percent = 0.015
     sl = capital * sl_percent * -1
@@ -63,15 +63,25 @@ def calculate_running_profit_loss():
                     continue
                 # key = get_ltp_key(x['instrument_token'])
                 # ltp = aero_client.get(key)
-                ltp = sql.get_ltp(x['instrument_token'],100000)
-                pnl = (x['sell_value'] - x['buy_value']) + (x['quantity'] * ltp * x['multiplier'])
+                # import ipdb;ipdb.set_trace()
+                try:
+                    ltp = sql.get_ltp(x['instrument_token'], 30)
+                    pnl = (x['sell_value'] - x['buy_value']) + (x['quantity'] * ltp * x['multiplier'])
+                except Exception:
+                    logging.exception(
+                        "Exception...trying again!!,please check if LTP fetch script is running {}".format(x))
+                    time.sleep(1)
+                    total_pnl = 0  # Dont close positions when exceptions
+                    continue
                 if x['quantity'] < 0:
                     open_sell_positions.append(x)
                 if x['quantity'] > 0:
                     open_buy_positions.append(x)
                 total_pnl += pnl
             total_pnl = round(total_pnl)
-            logging.info("Total PNL {}".format(total_pnl))
+            logging.info("Total PNL: {} , Underlying LTP: {}, SL: {}, TP: {}".format(total_pnl,
+                                                                                     sql.get_ltp(underlying_instrument,
+                                                                                                 30), sl, tp))
             # Close all open positions if loss/profit is around X% of capital
             if total_pnl < sl:
                 square_off_positions(open_buy_positions, open_sell_positions, sl)
@@ -81,7 +91,7 @@ def calculate_running_profit_loss():
                 break
         else:
             logging.info("Error getting positions")
-        # if you change sleep then change 59 to even number above in the loop
+        # if you change sleep to 2  then change 59 to even number above in the loop
         time.sleep(1)
 
 
