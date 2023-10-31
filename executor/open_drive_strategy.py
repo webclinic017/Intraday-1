@@ -1,5 +1,4 @@
 from fetcher.kite.http_ohlc_fetcher import fetch_http_ohlc
-from cache.aerospike import aero_client, get_ltp_key
 from kiteconnect import KiteConnect
 import datetime
 import pandas as pd
@@ -23,7 +22,7 @@ def get_previous_day_data(instrument, current_date):
 
         previous_day_data = fetch_http_ohlc(stock=instrument, from_date=previous_date, to_date=previous_date,
                                             period="day")
-        if len(previous_day_data) == 0:
+        if not previous_day_data:
             continue
         else:
             df_previous_day_data = pd.DataFrame(previous_day_data,

@@ -1,18 +1,18 @@
 from kiteconnect import KiteTicker
 from conf.local_conf import username, auth_token
 from utils.log import logger_instance
-from conf.nifty_stocks import nifty_stock_list, nifty_expiry_strikes, nifty_indices
+from conf.nifty_stocks import nifty_stock_list, nifty_expiry_strikes, nifty_indices_list
 from urllib.parse import quote_plus
 from cache.sqllite_cache import Sqllite
 import sqlite3
 
 logger = logger_instance
 
-nifty_instrument_token = [256265, 260105]
-
 nifty_stocks = [x['instrumenttoken'] for x in nifty_stock_list]
 
-instrument_list = nifty_indices + nifty_expiry_strikes  # + nifty_stocks
+nifty_indices = [x['instrumenttoken'] for x in nifty_indices_list]
+
+instrument_list = nifty_indices + nifty_expiry_strikes + nifty_stocks
 
 
 class KT(KiteTicker):
@@ -28,7 +28,7 @@ class KT(KiteTicker):
 
 
 def on_ticks(ws, ticks):  # noqa
-    logger.debug(ticks)
+    logger.info("Sample Data: {}".format(ticks[0]))
     for i in ticks:
         key = str(i['instrument_token'])
         KT.sql.set_ltp(key, i['last_price'])

@@ -10,12 +10,15 @@ logging = logger_instance
 
 
 # Strategy Details:
-# Simple straddle where we take position at 9:20 and sell at 15:15 if SL's are not hit on any leg
-# If any leg has a SL hit of 30% then we exit only that leg and wait for other leg to get squared off on SL or
+# Simple straddle where we take position at 9:20 and sell at 15:15
+# If the total loss of legs is < configured portfolio_loss config then exit all legs
 # at 15:15
 
 
 class TestStrategy(bt.Strategy):
+    params = (
+        ('portfolio_loss', -2000),
+    )
 
     def log(self, txt, dt=None):
         ''' Logging function for this strategy'''
@@ -27,8 +30,6 @@ class TestStrategy(bt.Strategy):
         self.order1_close = None
         self.order = None
         self.order1 = None
-        # self.atr_pe = bt.talib.ATR(self.data0.high, self.data0.low, self.data0.close, timeperiod=100)
-        # self.atr_ce = bt.talib.ATR(self.data1.high, self.data1.low, self.data1.close, timeperiod=100)
         self.pnl = 0
 
     def notify_trade(self, trade):
@@ -55,11 +56,6 @@ class TestStrategy(bt.Strategy):
             self.log('Order Canceled/Margin/Rejected for {}'.format(order.product_type))
 
     def next(self):
-        portfolio_loss = -2000
-        sl = 0.30
-        # sl_pe = self.atr_pe[0] * 2
-        # sl_ce = self.atr_ce[0] * 2
-        sl_pe = sl_ce = 0.30
 
         # skip mondays
         # if self.data0.datetime.datetime().date().weekday() == 0:
@@ -89,35 +85,19 @@ class TestStrategy(bt.Strategy):
 
         else:
 
-            if self.order and self.data0.close[0] > (self.order.executed.price * (1 + sl_pe)) and self.getposition(
-                    self.data0):
-                self.log('BUY CREATE, {}, {}-{} - {}'.format(self.data0.close[0], self.data0.close[0],
-                                                             self.order.executed.price * (1 + sl),
-                                                             self.order.product_type))
-                self.order_close = self.buy(self.data0)
-                self.order_close.product_type = self.data0._name
-
-            if self.order1 and self.data1.close[0] > (
-                    self.order1.executed.price * (1 + sl_ce)) and self.getposition(self.data1):
-                self.log('BUY CREATE, {}, {}-{} - {}'.format(self.data1.close[0], self.data1.close[0],
-                                                        self.order1.executed.price * (1 + sl),
-                                                        self.order1.product_type))
-                self.order1_close = self.buy(self.data1)
-                self.order1_close.product_type = self.data1._name
-
             # Below is exit condition based on portfolio loss
-            # if total_pnl + self.pnl < portfolio_loss:
-            #     if not self.order_close:
-            #         self.order_close = self.buy(self.data0)
-            #         self.order_close.product_type = self.data0._name
-            #         self.log('BUY CREATE, {} {}'.format(self.data0.close[0], self.order_close.product_type))
-            #
-            #     if not self.order1_close:
-            #         self.order1_close = self.buy(self.data1)
-            #         self.order1_close.product_type = self.data1._name
-            #         self.log('BUY CREATE, {} {}'.format(self.data1.close[0], self.order1_close.product_type))
+            if total_pnl + self.pnl < self.p.portfolio_loss:
+                if self.getposition(self.data0):
+                    self.order_close = self.buy(self.data0)
+                    self.order_close.product_type = self.data0._name
+                    self.log('BUY CREATE, {} {}'.format(self.data0.close[0], self.order_close.product_type))
 
-        if self.data0.datetime.datetime().time().hour == 15 and self.data0.datetime.datetime().time().minute == 20:
+                if self.getposition(self.data1):
+                    self.order1_close = self.buy(self.data1)
+                    self.order1_close.product_type = self.data1._name
+                    self.log('BUY CREATE, {} {}'.format(self.data1.close[0], self.order1_close.product_type))
+
+        if self.data0.datetime.cache/sqllite_cache.pydatetime().time().hour == 15 and self.data0.datetime.datetime().time().minute == 20:
             if self.getposition(self.data0):
                 o = self.buy(self.data0)
                 o.product_type = self.data0._name
@@ -151,6 +131,7 @@ def main():
     start_date = data["start_date"]
     end_date = data["end_date"]
     table_name = data["table_name"]
+    portfolio_loss = int(data["portfolio_loss"])
 
     con = sqlite3.connect(strike_dbpath)
     con1 = sqlite3.connect(underlying_dbpath)
@@ -207,7 +188,7 @@ def main():
     data_ce = bt.feeds.PandasData(dataname=df_final_ce)
     cerebro.adddata(data_pe, name='PE')
     cerebro.adddata(data_ce, name='CE')
-    cerebro.addstrategy(TestStrategy)
+    cerebro.addstrategy(TestStrategy, portfolio_loss=portfolio_loss)
     cerebro.addsizer(bt.sizers.SizerFix, stake=50)
     cerebro.addanalyzer(bt.analyzers.PyFolio, _name='pyfolio')
 
@@ -235,7 +216,7 @@ def main():
     df1day.dropna(inplace=True)
     qs.extend_pandas()
     qs.reports.html(returns, output='backtester/stats.html', download_filename='backtester/stats.html',
-                    title='Simple Straddle')
+                    title='Portfolio Fixed SL Based Straddle')
     vix = df1day.open.apply(lambda x: x / 100)
     # fig = go.Figure(data=[
     #     go.Scatter(x=test.index, y=vix, line=dict(color='black', width=1), name="VIX", mode="lines+markers"),
